@@ -594,25 +594,79 @@ struct VideoCard: View {
 
 // MARK: - Video Info Sheet (Simple info without embed)
 
+// MARK: - YouTube Embed Player (In-App Playback)
+
+struct YouTubeEmbedPlayer: UIViewRepresentable {
+    let videoId: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.scrollView.isScrollEnabled = false
+        webView.backgroundColor = .black
+        webView.isOpaque = false
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        let embedHTML = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <style>
+                * { margin: 0; padding: 0; }
+                html, body { width: 100%; height: 100%; background: #000; }
+                iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+            </style>
+        </head>
+        <body>
+            <iframe
+                src="https://www.youtube.com/embed/\(videoId)?playsinline=1&rel=0&modestbranding=1&showinfo=0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+            </iframe>
+        </body>
+        </html>
+        """
+        webView.loadHTMLString(embedHTML, baseURL: nil)
+    }
+}
+
 struct VideoInfoSheet: View {
     let video: YouTubeVideo
     @Environment(\.dismiss) private var dismiss
+    @State private var showInAppPlayer = true
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Thumbnail
-                    AsyncImage(url: URL(string: video.thumbnailURL)) { image in
-                        image
-                            .resizable()
+                    // In-App YouTube Player
+                    if showInAppPlayer {
+                        YouTubeEmbedPlayer(videoId: video.id)
                             .aspectRatio(16/9, contentMode: .fit)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .aspectRatio(16/9, contentMode: .fit)
+                            .cornerRadius(12)
+                            .shadow(radius: 4)
+                    } else {
+                        // Thumbnail fallback
+                        AsyncImage(url: URL(string: video.thumbnailURL)) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(16/9, contentMode: .fit)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .aspectRatio(16/9, contentMode: .fit)
+                                .overlay(
+                                    ProgressView()
+                                )
+                        }
+                        .cornerRadius(12)
                     }
-                    .cornerRadius(12)
 
                     Text(video.title)
                         .font(.title3.bold())
@@ -638,48 +692,51 @@ struct VideoInfoSheet: View {
 
                     Divider()
 
-                    // Watch Button
-                    Button(action: {
-                        if let url = video.videoURL {
-                            UIApplication.shared.open(url)
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "play.fill")
-                            Text("Watch on YouTube")
-                        }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red)
-                        .cornerRadius(12)
-                    }
-
-                    // Share Button
-                    Button(action: {
-                        if let url = video.videoURL {
-                            let activityVC = UIActivityViewController(
-                                activityItems: [url],
-                                applicationActivities: nil
-                            )
-                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                               let window = windowScene.windows.first,
-                               let rootVC = window.rootViewController {
-                                rootVC.present(activityVC, animated: true)
+                    // Action Buttons
+                    HStack(spacing: 12) {
+                        // Open in YouTube App
+                        Button(action: {
+                            if let url = video.videoURL {
+                                UIApplication.shared.open(url)
                             }
+                        }) {
+                            HStack {
+                                Image(systemName: "play.rectangle.fill")
+                                Text("YouTube")
+                            }
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.red)
+                            .cornerRadius(10)
                         }
-                    }) {
-                        HStack {
-                            Image(systemName: "square.and.arrow.up")
-                            Text("Share")
+
+                        // Share Button
+                        Button(action: {
+                            if let url = URL(string: "https://www.youtube.com/watch?v=\(video.id)") {
+                                let activityVC = UIActivityViewController(
+                                    activityItems: [video.title, url],
+                                    applicationActivities: nil
+                                )
+                                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                   let window = windowScene.windows.first,
+                                   let rootVC = window.rootViewController {
+                                    rootVC.present(activityVC, animated: true)
+                                }
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                Text("Share")
+                            }
+                            .font(.subheadline.bold())
+                            .foregroundColor(.blue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(10)
                         }
-                        .font(.headline)
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(12)
                     }
 
                     Divider()
@@ -689,7 +746,7 @@ struct VideoInfoSheet: View {
                 }
                 .padding()
             }
-            .navigationTitle("Video Info")
+            .navigationTitle("Watch Video")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -765,39 +822,83 @@ struct ShortsVerticalViewer: View {
     }
 }
 
+// MARK: - YouTube Shorts Embed Player (Full Screen)
+
+struct YouTubeShortsEmbedPlayer: UIViewRepresentable {
+    let videoId: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.scrollView.isScrollEnabled = false
+        webView.backgroundColor = .black
+        webView.isOpaque = false
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        // Use YouTube Shorts embed URL
+        let embedHTML = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <style>
+                * { margin: 0; padding: 0; }
+                html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+                iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+            </style>
+        </head>
+        <body>
+            <iframe
+                src="https://www.youtube.com/embed/\(videoId)?playsinline=1&rel=0&modestbranding=1&autoplay=1&loop=1"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+            </iframe>
+        </body>
+        </html>
+        """
+        webView.loadHTMLString(embedHTML, baseURL: nil)
+    }
+}
+
 // MARK: - Short Card View (for vertical viewer)
 
 struct ShortCardView: View {
     let video: YouTubeVideo
     let geometry: GeometryProxy
     @State private var isLiked = false
+    @State private var isPlaying = false
 
     var body: some View {
         ZStack {
-            // Background thumbnail
-            AsyncImage(url: URL(string: video.thumbnailURL)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-            } placeholder: {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-            }
-            .blur(radius: 20)
-            .overlay(Color.black.opacity(0.4))
+            // Background - Black
+            Color.black
 
-            // Main content
-            VStack {
-                Spacer()
+            // YouTube Embed Player (Full Screen)
+            if isPlaying {
+                YouTubeShortsEmbedPlayer(videoId: video.id)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            } else {
+                // Thumbnail with play button
+                AsyncImage(url: URL(string: video.thumbnailURL)) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .overlay(ProgressView().tint(.white))
+                }
+                .overlay(Color.black.opacity(0.3))
 
                 // Center play button
-                Button(action: {
-                    if let url = video.shortURL {
-                        UIApplication.shared.open(url)
-                    }
-                }) {
+                Button(action: { isPlaying = true }) {
                     ZStack {
                         Circle()
                             .fill(Color.red)
@@ -808,12 +909,10 @@ struct ShortCardView: View {
                             .foregroundColor(.white)
                     }
                 }
+            }
 
-                Text("Tap to watch on YouTube")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
-                    .padding(.top, 8)
-
+            // Overlay UI (always visible)
+            VStack {
                 Spacer()
 
                 // Bottom info
@@ -834,6 +933,7 @@ struct ShortCardView: View {
                             Text(video.channel)
                                 .font(.subheadline.bold())
                                 .foregroundColor(.white)
+                                .shadow(radius: 2)
                         }
 
                         // Title
@@ -842,6 +942,7 @@ struct ShortCardView: View {
                             .foregroundColor(.white)
                             .lineLimit(3)
                             .multilineTextAlignment(.leading)
+                            .shadow(radius: 2)
 
                         // Category tag
                         HStack(spacing: 4) {
@@ -867,17 +968,19 @@ struct ShortCardView: View {
                                 Image(systemName: isLiked ? "heart.fill" : "heart")
                                     .font(.title)
                                     .foregroundColor(isLiked ? .red : .white)
+                                    .shadow(radius: 2)
                                 Text("Like")
                                     .font(.caption2)
                                     .foregroundColor(.white)
+                                    .shadow(radius: 2)
                             }
                         }
 
                         // Share button
                         Button(action: {
-                            if let url = video.shortURL {
+                            if let url = URL(string: "https://www.youtube.com/shorts/\(video.id)") {
                                 let activityVC = UIActivityViewController(
-                                    activityItems: [url],
+                                    activityItems: [video.title, url],
                                     applicationActivities: nil
                                 )
                                 if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -891,25 +994,33 @@ struct ShortCardView: View {
                                 Image(systemName: "arrowshape.turn.up.right.fill")
                                     .font(.title)
                                     .foregroundColor(.white)
+                                    .shadow(radius: 2)
                                 Text("Share")
                                     .font(.caption2)
                                     .foregroundColor(.white)
+                                    .shadow(radius: 2)
                             }
                         }
 
-                        // YouTube button
+                        // Open in YouTube button
                         Button(action: {
-                            if let url = video.shortURL {
-                                UIApplication.shared.open(url)
+                            if let url = URL(string: "youtube://www.youtube.com/shorts/\(video.id)") {
+                                if UIApplication.shared.canOpenURL(url) {
+                                    UIApplication.shared.open(url)
+                                } else if let webURL = URL(string: "https://www.youtube.com/shorts/\(video.id)") {
+                                    UIApplication.shared.open(webURL)
+                                }
                             }
                         }) {
                             VStack(spacing: 4) {
                                 Image(systemName: "play.rectangle.fill")
                                     .font(.title)
                                     .foregroundColor(.white)
+                                    .shadow(radius: 2)
                                 Text("YouTube")
                                     .font(.caption2)
                                     .foregroundColor(.white)
+                                    .shadow(radius: 2)
                             }
                         }
                     }
@@ -919,6 +1030,12 @@ struct ShortCardView: View {
             }
         }
         .frame(width: geometry.size.width, height: geometry.size.height)
+        .onAppear {
+            // Auto-play when card appears
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isPlaying = true
+            }
+        }
     }
 }
 
