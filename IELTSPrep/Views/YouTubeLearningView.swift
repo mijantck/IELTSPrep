@@ -333,8 +333,8 @@ struct YouTubeLearningView: View {
             LazyVStack(spacing: 12) {
                 ForEach(filteredVideos) { video in
                     VideoCard(video: video) {
-                        // Try YouTube app first, then web
-                        openYouTubeVideo(video)
+                        // Open in-app player
+                        selectedVideo = video
                     } onInfoTap: {
                         selectedVideo = video
                     }
