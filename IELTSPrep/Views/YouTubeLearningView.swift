@@ -604,35 +604,41 @@ struct YouTubeEmbedPlayer: UIViewRepresentable {
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
 
+        // Allow JavaScript
+        let preferences = WKWebpagePreferences()
+        preferences.allowsContentJavaScript = true
+        configuration.defaultWebpagePreferences = preferences
+
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.scrollView.isScrollEnabled = false
+        webView.scrollView.bounces = false
         webView.backgroundColor = .black
         webView.isOpaque = false
+
+        // Allow navigation to YouTube
+        webView.navigationDelegate = context.coordinator
+
         return webView
     }
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func updateUIView(_ webView: WKWebView, context: Context) {
-        let embedHTML = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <style>
-                * { margin: 0; padding: 0; }
-                html, body { width: 100%; height: 100%; background: #000; }
-                iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
-            </style>
-        </head>
-        <body>
-            <iframe
-                src="https://www.youtube.com/embed/\(videoId)?playsinline=1&rel=0&modestbranding=1&showinfo=0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen>
-            </iframe>
-        </body>
-        </html>
-        """
-        webView.loadHTMLString(embedHTML, baseURL: nil)
+        // Load YouTube watch page directly in mobile view
+        let youtubeURL = "https://www.youtube.com/watch?v=\(videoId)"
+        if let url = URL(string: youtubeURL) {
+            let request = URLRequest(url: url)
+            webView.load(request)
+        }
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            // Allow all YouTube navigation
+            decisionHandler(.allow)
+        }
     }
 }
 
@@ -832,36 +838,38 @@ struct YouTubeShortsEmbedPlayer: UIViewRepresentable {
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
 
+        // Allow JavaScript
+        let preferences = WKWebpagePreferences()
+        preferences.allowsContentJavaScript = true
+        configuration.defaultWebpagePreferences = preferences
+
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.scrollView.isScrollEnabled = false
+        webView.scrollView.bounces = false
         webView.backgroundColor = .black
         webView.isOpaque = false
+        webView.navigationDelegate = context.coordinator
+
         return webView
     }
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func updateUIView(_ webView: WKWebView, context: Context) {
-        // Use YouTube Shorts embed URL
-        let embedHTML = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <style>
-                * { margin: 0; padding: 0; }
-                html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
-                iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
-            </style>
-        </head>
-        <body>
-            <iframe
-                src="https://www.youtube.com/embed/\(videoId)?playsinline=1&rel=0&modestbranding=1&autoplay=1&loop=1"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen>
-            </iframe>
-        </body>
-        </html>
-        """
-        webView.loadHTMLString(embedHTML, baseURL: nil)
+        // Load YouTube Shorts page directly
+        let shortsURL = "https://www.youtube.com/shorts/\(videoId)"
+        if let url = URL(string: shortsURL) {
+            let request = URLRequest(url: url)
+            webView.load(request)
+        }
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            decisionHandler(.allow)
+        }
     }
 }
 
