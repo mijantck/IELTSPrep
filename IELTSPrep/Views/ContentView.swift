@@ -12,6 +12,11 @@ struct ContentView: View {
                     Label("Home", systemImage: "house.fill")
                 }
 
+            MockTestView()
+                .tabItem {
+                    Label("Tests", systemImage: "doc.text.fill")
+                }
+
             LessonsView()
                 .tabItem {
                     Label("Learn", systemImage: "book.fill")
@@ -20,11 +25,6 @@ struct ContentView: View {
             VocabularyView()
                 .tabItem {
                     Label("Vocab", systemImage: "textformat.abc")
-                }
-
-            WritingView()
-                .tabItem {
-                    Label("Write", systemImage: "pencil.and.outline")
                 }
 
             SettingsView()

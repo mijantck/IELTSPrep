@@ -8,9 +8,8 @@ import AVFoundation
 class IELTSAPIService: ObservableObject {
     static let shared = IELTSAPIService()
 
-    // MARK: - API Key
-    // Get your free API key from https://console.groq.com
-    @Published var groqAPIKey: String = "" // Add your Groq API key here
+    // MARK: - API Key (Set via Settings or Environment)
+    @Published var groqAPIKey: String = ""
 
     var isGroqConfigured: Bool { !groqAPIKey.isEmpty }
 
@@ -126,6 +125,85 @@ class IELTSAPIService: ObservableObject {
         let explanation: String
     }
 
+    // MARK: - Cambridge Mock Test Models
+
+    struct CambridgeReadingTestContent {
+        let passages: [CambridgeReadingPassage]
+    }
+
+    struct CambridgeReadingPassage: Identifiable {
+        let id = UUID()
+        let title: String
+        let paragraphs: [String]
+        let questions: [CambridgeReadingQuestion]
+        let questionRange: String
+    }
+
+    struct CambridgeReadingQuestion: Identifiable {
+        let id = UUID()
+        let number: Int
+        let text: String
+        let type: CambridgeQuestionType
+        let options: [String]?
+        let answer: String
+
+        enum CambridgeQuestionType: String {
+            case multipleChoice = "mcq"
+            case trueFalseNotGiven = "tfng"
+            case yesNoNotGiven = "ynng"
+            case matchingHeadings = "match_head"
+            case matchingInformation = "match_info"
+            case sentenceCompletion = "sentence"
+            case summaryCompletion = "summary"
+            case fillInBlank = "fill"
+            case shortAnswer = "short"
+        }
+    }
+
+    struct CambridgeListeningTestContent {
+        let sections: [CambridgeListeningSection]
+    }
+
+    struct CambridgeListeningSection {
+        let context: String
+        let transcript: String
+        let questions: [CambridgeListeningQuestion]
+    }
+
+    struct CambridgeListeningQuestion {
+        let text: String
+        let answer: String
+        let type: String
+    }
+
+    struct CambridgeWritingTestContent {
+        let task1: CambridgeWritingTask
+        let task2: CambridgeWritingTask
+    }
+
+    struct CambridgeWritingTask {
+        let instruction: String
+        let prompt: String
+        let sampleAnswer: String?
+    }
+
+    struct CambridgeSpeakingTestContent {
+        let part1: CambridgeSpeakingPart
+        let part2: CambridgeSpeakingPart2
+        let part3: CambridgeSpeakingPart
+    }
+
+    struct CambridgeSpeakingPart {
+        let instruction: String
+        let questions: [String]
+    }
+
+    struct CambridgeSpeakingPart2 {
+        let topic: String
+        let bulletPoints: [String]
+        let followUp: String
+    }
+
     // MARK: - Groq AI Core Function
 
     // Custom URLSession that disables HTTP/3 to avoid QUIC issues
@@ -139,14 +217,17 @@ class IELTSAPIService: ObservableObject {
         return URLSession(configuration: config)
     }()
 
-    func callGroqAI(prompt: String, systemPrompt: String = "You are an expert IELTS tutor. Always respond with valid JSON only. Do NOT wrap JSON in markdown code blocks. Return raw JSON directly.", maxTokens: Int = 3000) async -> String? {
-        guard !groqAPIKey.isEmpty else { return nil }
+    func callGroqAI(prompt: String, systemPrompt: String = "You are an expert IELTS tutor. Always respond with valid JSON only. Do NOT wrap JSON in markdown code blocks. Return raw JSON directly.", maxTokens: Int = 3000, requireJSON: Bool = true) async -> String? {
+        guard !groqAPIKey.isEmpty else {
+            print("Groq API key is empty")
+            return nil
+        }
 
         // Retry up to 3 times
         for attempt in 1...3 {
             print("Groq AI attempt \(attempt)...")
 
-            if let result = await makeGroqRequest(prompt: prompt, systemPrompt: systemPrompt, maxTokens: maxTokens) {
+            if let result = await makeGroqRequest(prompt: prompt, systemPrompt: systemPrompt, maxTokens: maxTokens, requireJSON: requireJSON) {
                 return result
             }
 
@@ -161,7 +242,7 @@ class IELTSAPIService: ObservableObject {
         return nil
     }
 
-    private func makeGroqRequest(prompt: String, systemPrompt: String, maxTokens: Int) async -> String? {
+    private func makeGroqRequest(prompt: String, systemPrompt: String, maxTokens: Int, requireJSON: Bool) async -> String? {
         let url = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -170,16 +251,20 @@ class IELTSAPIService: ObservableObject {
         request.setValue("Bearer \(groqAPIKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": "llama-3.1-8b-instant",
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": prompt]
             ],
             "temperature": 0.3,
-            "max_tokens": maxTokens,
-            "response_format": ["type": "json_object"]
+            "max_tokens": maxTokens
         ]
+
+        // Only add JSON format requirement if needed
+        if requireJSON {
+            body["response_format"] = ["type": "json_object"]
+        }
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -696,10 +781,15 @@ class IELTSAPIService: ObservableObject {
         5. Synonyms
         6. How to use in IELTS Writing/Speaking
 
-        Keep it helpful for IELTS preparation.
+        Keep it helpful for IELTS preparation. Format nicely with clear sections.
         """
 
-        return await callGroqAI(prompt: prompt, systemPrompt: "You are an English vocabulary teacher helping Bengali students prepare for IELTS. Mix English and Bangla in your explanations.")
+        return await callGroqAI(
+            prompt: prompt,
+            systemPrompt: "You are an English vocabulary teacher helping Bengali students prepare for IELTS. Mix English and Bangla in your explanations. Respond in plain text with clear formatting.",
+            maxTokens: 1000,
+            requireJSON: false
+        )
     }
 
     // MARK: - Helper Functions
@@ -784,5 +874,331 @@ class IELTSAPIService: ObservableObject {
             print("Grammar check error: \(error)")
         }
         return []
+    }
+
+    // MARK: - Cambridge Style Test Generation
+
+    func generateCambridgeReadingTest(book: String, testNumber: Int) async -> CambridgeReadingTestContent? {
+        let topics = [
+            "The History of Timekeeping", "Coral Reef Ecosystems", "The Psychology of Decision Making",
+            "Urban Planning and Sustainability", "The Evolution of Language", "Artificial Intelligence Ethics",
+            "Climate Change Adaptation", "The Science of Sleep", "Ancient Trade Routes", "Modern Architecture"
+        ]
+
+        // Generate 3 passages
+        var passages: [CambridgeReadingPassage] = []
+
+        for i in 0..<3 {
+            let topicIndex = (Int(book) ?? 16 + testNumber + i) % topics.count
+            let topic = topics[topicIndex]
+
+            let prompt = """
+            Generate an IELTS Academic Reading passage about "\(topic)" for Cambridge IELTS \(book) Test \(testNumber) Passage \(i + 1).
+
+            Return JSON format:
+            {
+                "title": "passage title",
+                "paragraphs": ["paragraph 1 (150 words)", "paragraph 2 (150 words)", "paragraph 3 (150 words)", "paragraph 4 (150 words)", "paragraph 5 (150 words)"],
+                "questions": [
+                    {
+                        "number": 1,
+                        "text": "question text",
+                        "type": "mcq|tfng|ynng|fill|short",
+                        "options": ["A option", "B option", "C option", "D option"] or null,
+                        "answer": "correct answer"
+                    }
+                ]
+            }
+
+            Generate exactly 13 questions with these types:
+            - Questions 1-4: Multiple Choice (mcq)
+            - Questions 5-8: True/False/Not Given (tfng)
+            - Questions 9-11: Sentence Completion (fill)
+            - Questions 12-13: Short Answer (short)
+
+            Make the passage academic, detailed, and approximately 700-800 words total.
+            """
+
+            if let response = await callGroqAI(prompt: prompt, systemPrompt: "You are an IELTS exam content creator. Generate authentic Cambridge IELTS style reading passages. Return valid JSON only.", maxTokens: 4000) {
+                if let passage = parseReadingPassage(from: response, passageNumber: i + 1) {
+                    passages.append(passage)
+                }
+            }
+        }
+
+        return passages.isEmpty ? nil : CambridgeReadingTestContent(passages: passages)
+    }
+
+    private func parseReadingPassage(from json: String, passageNumber: Int) -> CambridgeReadingPassage? {
+        guard let jsonString = extractJSON(from: json),
+              let data = jsonString.data(using: .utf8) else { return nil }
+
+        do {
+            if let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let title = dict["title"] as? String ?? "Untitled Passage"
+                let paragraphs = dict["paragraphs"] as? [String] ?? []
+                let questionsArray = dict["questions"] as? [[String: Any]] ?? []
+
+                var questions: [CambridgeReadingQuestion] = []
+                let baseNum = (passageNumber - 1) * 13 + 1
+
+                for (index, q) in questionsArray.enumerated() {
+                    let qNum = baseNum + index
+                    let text = q["text"] as? String ?? ""
+                    let typeStr = q["type"] as? String ?? "fill"
+                    let options = q["options"] as? [String]
+                    let answer = q["answer"] as? String ?? ""
+
+                    let type: CambridgeReadingQuestion.CambridgeQuestionType
+                    switch typeStr {
+                    case "mcq": type = .multipleChoice
+                    case "tfng": type = .trueFalseNotGiven
+                    case "ynng": type = .yesNoNotGiven
+                    case "fill": type = .fillInBlank
+                    case "short": type = .shortAnswer
+                    default: type = .fillInBlank
+                    }
+
+                    questions.append(CambridgeReadingQuestion(
+                        number: qNum,
+                        text: text,
+                        type: type,
+                        options: options,
+                        answer: answer
+                    ))
+                }
+
+                let startQ = (passageNumber - 1) * 13 + 1
+                let endQ = startQ + 12
+
+                return CambridgeReadingPassage(
+                    title: title,
+                    paragraphs: paragraphs,
+                    questions: questions,
+                    questionRange: "\(startQ)-\(endQ)"
+                )
+            }
+        } catch {
+            print("Parse reading passage error: \(error)")
+        }
+        return nil
+    }
+
+    func generateCambridgeListeningTest(book: String, testNumber: Int) async -> CambridgeListeningTestContent? {
+        let contexts = [
+            ("A conversation between a student and accommodation officer about renting a flat", "everyday"),
+            ("A tour guide giving information about a local museum", "everyday"),
+            ("A discussion between two students and their tutor about a research project", "academic"),
+            ("A university lecture about environmental science", "academic")
+        ]
+
+        var sections: [CambridgeListeningSection] = []
+
+        for (index, context) in contexts.enumerated() {
+            let prompt = """
+            Generate IELTS Listening Section \(index + 1) for Cambridge IELTS \(book) Test \(testNumber).
+
+            Context: \(context.0)
+            Type: \(context.1)
+
+            Return JSON format:
+            {
+                "context": "brief description of the situation",
+                "transcript": "full dialogue or monologue transcript (300-400 words)",
+                "questions": [
+                    {"text": "question or sentence with blank ___", "answer": "answer", "type": "fill|mcq|match"}
+                ]
+            }
+
+            Generate exactly 10 questions. Mix question types:
+            - Fill in the blank (with maximum 2-3 words answers)
+            - Multiple choice
+            - Matching
+
+            Make it authentic Cambridge IELTS style.
+            """
+
+            if let response = await callGroqAI(prompt: prompt, systemPrompt: "You are an IELTS exam content creator. Generate authentic listening test content. Return valid JSON only.", maxTokens: 3000) {
+                if let section = parseListeningSection(from: response) {
+                    sections.append(section)
+                }
+            }
+        }
+
+        return sections.isEmpty ? nil : CambridgeListeningTestContent(sections: sections)
+    }
+
+    private func parseListeningSection(from json: String) -> CambridgeListeningSection? {
+        guard let jsonString = extractJSON(from: json),
+              let data = jsonString.data(using: .utf8) else { return nil }
+
+        do {
+            if let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let context = dict["context"] as? String ?? ""
+                let transcript = dict["transcript"] as? String ?? ""
+                let questionsArray = dict["questions"] as? [[String: Any]] ?? []
+
+                var questions: [CambridgeListeningQuestion] = []
+                for q in questionsArray {
+                    questions.append(CambridgeListeningQuestion(
+                        text: q["text"] as? String ?? "",
+                        answer: q["answer"] as? String ?? "",
+                        type: q["type"] as? String ?? "fill"
+                    ))
+                }
+
+                return CambridgeListeningSection(context: context, transcript: transcript, questions: questions)
+            }
+        } catch {
+            print("Parse listening section error: \(error)")
+        }
+        return nil
+    }
+
+    func generateCambridgeWritingTest(book: String, testNumber: Int) async -> CambridgeWritingTestContent? {
+        // Task 1 - Graph/Chart/Process
+        let task1Prompt = """
+        Generate an IELTS Academic Writing Task 1 for Cambridge IELTS \(book) Test \(testNumber).
+
+        Return JSON format:
+        {
+            "instruction": "You should spend about 20 minutes on this task.",
+            "prompt": "The chart/graph/diagram shows... Summarise the information by selecting and reporting the main features, and make comparisons where relevant. Write at least 150 words.",
+            "sampleAnswer": "A Band 8 model answer (180-200 words)"
+        }
+
+        Choose one type randomly:
+        - Line graph showing trends over time
+        - Bar chart comparing data
+        - Pie charts showing proportions
+        - Table with numerical data
+        - Process diagram
+        - Map showing changes
+
+        Make it authentic Cambridge IELTS style with realistic data.
+        """
+
+        // Task 2 - Essay
+        let task2Prompt = """
+        Generate an IELTS Academic Writing Task 2 for Cambridge IELTS \(book) Test \(testNumber).
+
+        Return JSON format:
+        {
+            "instruction": "You should spend about 40 minutes on this task. Write about the following topic:",
+            "prompt": "Essay question here... Give reasons for your answer and include any relevant examples from your own knowledge or experience. Write at least 250 words.",
+            "sampleAnswer": "A Band 8 model answer (280-320 words)"
+        }
+
+        Choose one essay type:
+        - Opinion essay (agree/disagree)
+        - Discussion essay (discuss both views)
+        - Problem-solution essay
+        - Advantages-disadvantages essay
+        - Two-part question
+
+        Topic should be about: education, technology, environment, society, health, or work.
+        Make it thought-provoking and authentic Cambridge IELTS style.
+        """
+
+        var task1: CambridgeWritingTask?
+        var task2: CambridgeWritingTask?
+
+        if let response1 = await callGroqAI(prompt: task1Prompt, systemPrompt: "You are an IELTS exam content creator. Return valid JSON only.", maxTokens: 2000) {
+            task1 = parseCambridgeWritingTask(from: response1)
+        }
+
+        if let response2 = await callGroqAI(prompt: task2Prompt, systemPrompt: "You are an IELTS exam content creator. Return valid JSON only.", maxTokens: 2000) {
+            task2 = parseCambridgeWritingTask(from: response2)
+        }
+
+        guard let t1 = task1, let t2 = task2 else { return nil }
+        return CambridgeWritingTestContent(task1: t1, task2: t2)
+    }
+
+    private func parseCambridgeWritingTask(from json: String) -> CambridgeWritingTask? {
+        guard let jsonString = extractJSON(from: json),
+              let data = jsonString.data(using: .utf8) else { return nil }
+
+        do {
+            if let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                return CambridgeWritingTask(
+                    instruction: dict["instruction"] as? String ?? "",
+                    prompt: dict["prompt"] as? String ?? "",
+                    sampleAnswer: dict["sampleAnswer"] as? String
+                )
+            }
+        } catch {
+            print("Parse writing task error: \(error)")
+        }
+        return nil
+    }
+
+    func generateCambridgeSpeakingTest(book: String, testNumber: Int) async -> CambridgeSpeakingTestContent? {
+        let prompt = """
+        Generate a complete IELTS Speaking Test for Cambridge IELTS \(book) Test \(testNumber).
+
+        Return JSON format:
+        {
+            "part1": {
+                "instruction": "The examiner will ask general questions about yourself and familiar topics.",
+                "questions": ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"]
+            },
+            "part2": {
+                "topic": "Describe a [topic]. You should say:",
+                "bulletPoints": ["point 1", "point 2", "point 3"],
+                "followUp": "and explain why..."
+            },
+            "part3": {
+                "instruction": "The examiner will ask further questions connected to the topic in Part 2.",
+                "questions": ["Discussion question 1", "Discussion question 2", "Discussion question 3", "Discussion question 4"]
+            }
+        }
+
+        Part 1 topics: home, work/study, hobbies, daily routine, hometown
+        Part 2: A memorable experience, person, place, or object
+        Part 3: Abstract discussion related to Part 2 topic
+
+        Make questions authentic Cambridge IELTS style.
+        """
+
+        guard let response = await callGroqAI(prompt: prompt, systemPrompt: "You are an IELTS exam content creator. Return valid JSON only.", maxTokens: 2000) else {
+            return nil
+        }
+
+        return parseCambridgeSpeakingTest(from: response)
+    }
+
+    private func parseCambridgeSpeakingTest(from json: String) -> CambridgeSpeakingTestContent? {
+        guard let jsonString = extractJSON(from: json),
+              let data = jsonString.data(using: .utf8) else { return nil }
+
+        do {
+            if let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let part1Dict = dict["part1"] as? [String: Any] ?? [:]
+                let part2Dict = dict["part2"] as? [String: Any] ?? [:]
+                let part3Dict = dict["part3"] as? [String: Any] ?? [:]
+
+                let part1 = CambridgeSpeakingPart(
+                    instruction: part1Dict["instruction"] as? String ?? "Answer the following questions.",
+                    questions: part1Dict["questions"] as? [String] ?? []
+                )
+
+                let part2 = CambridgeSpeakingPart2(
+                    topic: part2Dict["topic"] as? String ?? "",
+                    bulletPoints: part2Dict["bulletPoints"] as? [String] ?? [],
+                    followUp: part2Dict["followUp"] as? String ?? ""
+                )
+
+                let part3 = CambridgeSpeakingPart(
+                    instruction: part3Dict["instruction"] as? String ?? "Discuss the following questions.",
+                    questions: part3Dict["questions"] as? [String] ?? []
+                )
+
+                return CambridgeSpeakingTestContent(part1: part1, part2: part2, part3: part3)
+            }
+        } catch {
+            print("Parse speaking test error: \(error)")
+        }
+        return nil
     }
 }

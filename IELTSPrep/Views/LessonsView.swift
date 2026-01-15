@@ -16,6 +16,12 @@ struct LessonsView: View {
                         onChangeTopic: { showTopicPicker = true }
                     )
 
+                    // YouTube Learning Hub
+                    NavigationLink(destination: YouTubeLearningView()) {
+                        YouTubeLearningCard()
+                    }
+                    .buttonStyle(.plain)
+
                     // Category Cards
                     ForEach(LessonCategory.allCases, id: \.rawValue) { category in
                         NavigationLink(destination: destinationView(for: category)) {
@@ -1693,20 +1699,21 @@ struct EmptyStateView: View {
 }
 
 // MARK: - Interactive Reading Text
+struct SelectedWord: Identifiable {
+    let id = UUID()
+    let word: String
+}
+
 struct InteractiveReadingText: View {
     let text: String
-    @State private var selectedWord: String?
-    @State private var showWordPopup = false
+    @State private var selectedWord: SelectedWord?
 
     var body: some View {
         FlowLayoutText(text: text) { word in
-            selectedWord = word
-            showWordPopup = true
+            selectedWord = SelectedWord(word: word)
         }
-        .sheet(isPresented: $showWordPopup) {
-            if let word = selectedWord {
-                WordLookupSheet(word: word)
-            }
+        .sheet(item: $selectedWord) { selected in
+            WordLookupSheet(word: selected.word)
         }
     }
 }

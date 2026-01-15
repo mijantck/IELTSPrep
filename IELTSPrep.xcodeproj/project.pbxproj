@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4DB5B60ED00E8DE3CAA3C9B6 /* YouTubeAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A396D372C8F25DCF7852672F /* YouTubeAPIService.swift */; };
+		6E550ED79DFF8F9D9F3307DE /* YouTubeLearningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227D07FA85C282ED996B99B9 /* YouTubeLearningView.swift */; };
 		A1000001231D0001 /* IELTSPrepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001231D0002 /* IELTSPrepApp.swift */; };
 		A1000001231D0003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001231D0004 /* ContentView.swift */; };
 		A1000001231D0005 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001231D0006 /* DashboardView.swift */; };
@@ -33,6 +35,7 @@
 		A3000001231D0001 /* VocabularyData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000001231D0002 /* VocabularyData.swift */; };
 		A4000001231D0001 /* IELTSAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4000001231D0002 /* IELTSAPIService.swift */; };
 		A5000001231D0001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000001231D0002 /* SettingsView.swift */; };
+		E1DE86D19F2931FFFD9C53EA /* MockTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E3CBD0F8332DA9532CE580E /* MockTestView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +63,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		227D07FA85C282ED996B99B9 /* YouTubeLearningView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YouTubeLearningView.swift; sourceTree = "<group>"; };
+		4E3CBD0F8332DA9532CE580E /* MockTestView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockTestView.swift; sourceTree = "<group>"; };
 		A1000001231D0002 /* IELTSPrepApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IELTSPrepApp.swift; sourceTree = "<group>"; };
 		A1000001231D0004 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A1000001231D0006 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -85,6 +90,7 @@
 		A2000001231D000A /* SpeakingLessonsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakingLessonsView.swift; sourceTree = "<group>"; };
 		A2000001231D000C /* ListeningLessonsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningLessonsView.swift; sourceTree = "<group>"; };
 		A3000001231D0002 /* VocabularyData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocabularyData.swift; sourceTree = "<group>"; };
+		A396D372C8F25DCF7852672F /* YouTubeAPIService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YouTubeAPIService.swift; sourceTree = "<group>"; };
 		A4000001231D0002 /* IELTSAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IELTSAPIService.swift; sourceTree = "<group>"; };
 		A5000001231D0002 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -173,6 +179,8 @@
 				A2000001231D000A /* SpeakingLessonsView.swift */,
 				A2000001231D000C /* ListeningLessonsView.swift */,
 				A5000001231D0002 /* SettingsView.swift */,
+				4E3CBD0F8332DA9532CE580E /* MockTestView.swift */,
+				227D07FA85C282ED996B99B9 /* YouTubeLearningView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -202,6 +210,7 @@
 			children = (
 				A1000001231D0010 /* APIService.swift */,
 				A4000001231D0002 /* IELTSAPIService.swift */,
+				A396D372C8F25DCF7852672F /* YouTubeAPIService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -334,6 +343,9 @@
 				A3000001231D0001 /* VocabularyData.swift in Sources */,
 				A4000001231D0001 /* IELTSAPIService.swift in Sources */,
 				A5000001231D0001 /* SettingsView.swift in Sources */,
+				E1DE86D19F2931FFFD9C53EA /* MockTestView.swift in Sources */,
+				6E550ED79DFF8F9D9F3307DE /* YouTubeLearningView.swift in Sources */,
+				4DB5B60ED00E8DE3CAA3C9B6 /* YouTubeAPIService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
