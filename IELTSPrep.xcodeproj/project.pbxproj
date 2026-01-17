@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		4DB5B60ED00E8DE3CAA3C9B6 /* YouTubeAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A396D372C8F25DCF7852672F /* YouTubeAPIService.swift */; };
 		6E550ED79DFF8F9D9F3307DE /* YouTubeLearningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227D07FA85C282ED996B99B9 /* YouTubeLearningView.swift */; };
+		75882C95E9A0288E77D95486 /* FocusModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F2E44A869A8F9E43C5C9B1 /* FocusModeView.swift */; };
 		A1000001231D0001 /* IELTSPrepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001231D0002 /* IELTSPrepApp.swift */; };
 		A1000001231D0003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001231D0004 /* ContentView.swift */; };
 		A1000001231D0005 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001231D0006 /* DashboardView.swift */; };
@@ -93,6 +94,7 @@
 		A396D372C8F25DCF7852672F /* YouTubeAPIService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YouTubeAPIService.swift; sourceTree = "<group>"; };
 		A4000001231D0002 /* IELTSAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IELTSAPIService.swift; sourceTree = "<group>"; };
 		A5000001231D0002 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A8F2E44A869A8F9E43C5C9B1 /* FocusModeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocusModeView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,6 +183,7 @@
 				A5000001231D0002 /* SettingsView.swift */,
 				4E3CBD0F8332DA9532CE580E /* MockTestView.swift */,
 				227D07FA85C282ED996B99B9 /* YouTubeLearningView.swift */,
+				A8F2E44A869A8F9E43C5C9B1 /* FocusModeView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -346,6 +349,7 @@
 				E1DE86D19F2931FFFD9C53EA /* MockTestView.swift in Sources */,
 				6E550ED79DFF8F9D9F3307DE /* YouTubeLearningView.swift in Sources */,
 				4DB5B60ED00E8DE3CAA3C9B6 /* YouTubeAPIService.swift in Sources */,
+				75882C95E9A0288E77D95486 /* FocusModeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

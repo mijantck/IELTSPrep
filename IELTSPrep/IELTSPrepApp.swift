@@ -7,6 +7,6 @@ struct IELTSPrepApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [DailyTask.self, VocabularyWord.self, WritingPractice.self])
+        .modelContainer(for: [DailyTask.self, VocabularyWord.self, WritingPractice.self, StudySession.self])
     }
 }
