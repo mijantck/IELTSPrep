@@ -22,6 +22,12 @@ struct LessonsView: View {
                     }
                     .buttonStyle(.plain)
 
+                    // Vocabulary Section
+                    NavigationLink(destination: VocabularyView()) {
+                        VocabularyCard()
+                    }
+                    .buttonStyle(.plain)
+
                     // Category Cards
                     ForEach(LessonCategory.allCases, id: \.rawValue) { category in
                         NavigationLink(destination: destinationView(for: category)) {
@@ -1803,6 +1809,64 @@ struct WordLookupSheet: View {
                 isLoading = false
             }
         }
+    }
+}
+
+// MARK: - Vocabulary Card (for Learn section)
+struct VocabularyCard: View {
+    var body: some View {
+        HStack(spacing: 16) {
+            // Icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [.teal, .teal.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 60, height: 60)
+
+                Image(systemName: "textformat.abc")
+                    .font(.system(size: 28))
+                    .foregroundColor(.white)
+            }
+
+            // Text content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Vocabulary Builder")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Image(systemName: "star.fill")
+                        .font(.caption)
+                        .foregroundColor(.yellow)
+                }
+
+                Text("Learn new words, flashcards & spaced repetition")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+
+                HStack(spacing: 8) {
+                    Label("Flashcards", systemImage: "rectangle.stack.fill")
+                    Label("Quiz", systemImage: "questionmark.circle.fill")
+                }
+                .font(.caption2)
+                .foregroundColor(.teal.opacity(0.8))
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }
 }
 

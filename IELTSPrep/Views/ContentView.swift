@@ -27,11 +27,6 @@ struct ContentView: View {
                     Label("Learn", systemImage: "book.fill")
                 }
 
-            VocabularyView()
-                .tabItem {
-                    Label("Vocab", systemImage: "textformat.abc")
-                }
-
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
