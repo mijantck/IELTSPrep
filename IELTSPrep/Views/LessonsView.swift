@@ -28,6 +28,12 @@ struct LessonsView: View {
                     }
                     .buttonStyle(.plain)
 
+                    // Grammar Lab (Smart Translator)
+                    NavigationLink(destination: SmartTranslatorView()) {
+                        GrammarLabCard()
+                    }
+                    .buttonStyle(.plain)
+
                     // Category Cards
                     ForEach(LessonCategory.allCases, id: \.rawValue) { category in
                         NavigationLink(destination: destinationView(for: category)) {

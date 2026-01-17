@@ -37,6 +37,7 @@
 		A4000001231D0001 /* IELTSAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4000001231D0002 /* IELTSAPIService.swift */; };
 		A5000001231D0001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000001231D0002 /* SettingsView.swift */; };
 		E1DE86D19F2931FFFD9C53EA /* MockTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E3CBD0F8332DA9532CE580E /* MockTestView.swift */; };
+		E5FC342BDE07AD9246F50166 /* SmartTranslatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1206BC8B7408760F14A65353 /* SmartTranslatorView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +65,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1206BC8B7408760F14A65353 /* SmartTranslatorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartTranslatorView.swift; sourceTree = "<group>"; };
 		227D07FA85C282ED996B99B9 /* YouTubeLearningView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YouTubeLearningView.swift; sourceTree = "<group>"; };
 		4E3CBD0F8332DA9532CE580E /* MockTestView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockTestView.swift; sourceTree = "<group>"; };
 		A1000001231D0002 /* IELTSPrepApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IELTSPrepApp.swift; sourceTree = "<group>"; };
@@ -184,6 +186,7 @@
 				4E3CBD0F8332DA9532CE580E /* MockTestView.swift */,
 				227D07FA85C282ED996B99B9 /* YouTubeLearningView.swift */,
 				A8F2E44A869A8F9E43C5C9B1 /* FocusModeView.swift */,
+				1206BC8B7408760F14A65353 /* SmartTranslatorView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -350,6 +353,7 @@
 				6E550ED79DFF8F9D9F3307DE /* YouTubeLearningView.swift in Sources */,
 				4DB5B60ED00E8DE3CAA3C9B6 /* YouTubeAPIService.swift in Sources */,
 				75882C95E9A0288E77D95486 /* FocusModeView.swift in Sources */,
+				E5FC342BDE07AD9246F50166 /* SmartTranslatorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
