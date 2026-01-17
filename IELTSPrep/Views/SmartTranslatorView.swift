@@ -46,6 +46,10 @@ struct SmartTranslatorView: View {
                 .padding()
             }
             .background(Color(.systemGroupedBackground))
+            .onTapGesture {
+                // Dismiss keyboard when tapping outside
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
             .navigationTitle("Grammar Lab")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -555,10 +559,15 @@ struct SmartTranslatorView: View {
                     translationResult = result
                     isLoading = false
                 }
-            } catch {
+            } catch let error as NSError {
                 await MainActor.run {
-                    errorMessage = "Translation failed. Please check your internet connection."
+                    if error.domain == "API" && error.code == 401 {
+                        errorMessage = "API key not configured. Go to Settings to add your Groq API key."
+                    } else {
+                        errorMessage = "Translation failed: \(error.localizedDescription)"
+                    }
                     isLoading = false
+                    print("Translation error: \(error)")
                 }
             }
         }
@@ -651,42 +660,99 @@ struct SmartTranslatorView: View {
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        // Check HTTP status
+        if let httpResponse = response as? HTTPURLResponse {
+            print("API HTTP Status: \(httpResponse.statusCode)")
+            if httpResponse.statusCode != 200 {
+                let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+                print("API Error: \(errorBody)")
+                throw NSError(domain: "API", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "API error: \(httpResponse.statusCode)"])
+            }
+        }
 
         // Parse response
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        // Check for API error in response
+        if let error = json?["error"] as? [String: Any] {
+            let errorMessage = error["message"] as? String ?? "Unknown API error"
+            throw NSError(domain: "API", code: 500, userInfo: [NSLocalizedDescriptionKey: errorMessage])
+        }
+
         let choices = json?["choices"] as? [[String: Any]]
         let message = choices?.first?["message"] as? [String: Any]
         let content = message?["content"] as? String ?? ""
+
+        if content.isEmpty {
+            throw NSError(domain: "API", code: 500, userInfo: [NSLocalizedDescriptionKey: "Empty response from API"])
+        }
 
         // Extract JSON from response
         return try parseTranslationResponse(content, original: text)
     }
 
     private func parseTranslationResponse(_ content: String, original: String) throws -> TranslationResult {
-        // Find JSON in response
+        print("Raw API response: \(content.prefix(500))")
+
+        // Find JSON in response - handle nested braces properly
         var jsonString = content
-        if let startRange = content.range(of: "{"),
-           let endRange = content.range(of: "}", options: .backwards) {
-            jsonString = String(content[startRange.lowerBound...endRange.upperBound])
+        if let startIndex = content.firstIndex(of: "{") {
+            var braceCount = 0
+            var endIndex = startIndex
+
+            for i in content.indices[startIndex...] {
+                if content[i] == "{" { braceCount += 1 }
+                else if content[i] == "}" {
+                    braceCount -= 1
+                    if braceCount == 0 {
+                        endIndex = i
+                        break
+                    }
+                }
+            }
+            jsonString = String(content[startIndex...endIndex])
         }
 
         guard let jsonData = jsonString.data(using: .utf8) else {
-            throw NSError(domain: "Parse", code: 1, userInfo: nil)
+            throw NSError(domain: "Parse", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON data"])
         }
 
         let decoder = JSONDecoder()
-        var result = try decoder.decode(TranslationResponse.self, from: jsonData)
 
-        return TranslationResult(
-            original: original,
-            translation: result.translation,
-            structure: result.structure,
-            grammarRules: result.grammarRules,
-            wordAnalysis: result.wordAnalysis,
-            ielts: result.ielts,
-            synonyms: result.synonyms
-        )
+        do {
+            let result = try decoder.decode(TranslationResponse.self, from: jsonData)
+
+            return TranslationResult(
+                original: original,
+                translation: result.translation,
+                structure: result.structure,
+                grammarRules: result.grammarRules,
+                wordAnalysis: result.wordAnalysis,
+                ielts: result.ielts,
+                synonyms: result.synonyms
+            )
+        } catch {
+            print("JSON decode error: \(error)")
+
+            // Try manual parsing as fallback
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                let translation = json["translation"] as? String ?? "Translation not available"
+
+                return TranslationResult(
+                    original: original,
+                    translation: translation,
+                    structure: [],
+                    grammarRules: [GrammarRule(rule: "Analysis pending", explanation: "Please try again", formula: "-")],
+                    wordAnalysis: [],
+                    ielts: IELTSVersions(band6: translation, band8: translation),
+                    synonyms: []
+                )
+            }
+
+            throw NSError(domain: "Parse", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response: \(error.localizedDescription)"])
+        }
     }
 }
 
