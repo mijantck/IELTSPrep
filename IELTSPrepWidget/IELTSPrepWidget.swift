@@ -45,7 +45,22 @@ struct IELTSProvider: TimelineProvider {
     }
 
     private func calculateDaysRemaining() -> Int {
-        let examDate = Calendar.current.date(from: DateComponents(year: 2025, month: 3, day: 7))!
+        // Read exam date from shared UserDefaults (App Group)
+        let sharedDefaults = UserDefaults(suiteName: "group.com.ielts.IELTSPrep") ?? UserDefaults.standard
+
+        let examDate: Date
+        if let savedDate = sharedDefaults.object(forKey: "examDate") as? Date {
+            examDate = savedDate
+        } else {
+            // Fallback: also check standard UserDefaults
+            if let standardDate = UserDefaults.standard.object(forKey: "examDate") as? Date {
+                examDate = standardDate
+            } else {
+                // Default: 3 months from now
+                examDate = Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
+            }
+        }
+
         let components = Calendar.current.dateComponents([.day], from: Date(), to: examDate)
         return max(0, components.day ?? 0)
     }

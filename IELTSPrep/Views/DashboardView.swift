@@ -30,6 +30,9 @@ struct DashboardView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("IELTS Prep")
+            .onAppear {
+                viewModel.calculateDaysRemaining()
+            }
         }
     }
 }
@@ -38,9 +41,15 @@ struct DashboardView: View {
 struct CountdownCard: View {
     let daysRemaining: Int
 
+    var examDateString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMMM yyyy"
+        return formatter.string(from: ExamConfig.examDate).uppercased()
+    }
+
     var body: some View {
         VStack(spacing: 12) {
-            Text("EXAM DATE: 7 MARCH 2025")
+            Text("EXAM DATE: \(examDateString)")
                 .font(.caption)
                 .fontWeight(.semibold)
                 .foregroundColor(.white.opacity(0.8))

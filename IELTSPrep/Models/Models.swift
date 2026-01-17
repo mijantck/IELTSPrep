@@ -3,8 +3,43 @@ import SwiftData
 
 // MARK: - Exam Configuration
 struct ExamConfig {
-    static let examDate = Calendar.current.date(from: DateComponents(year: 2025, month: 3, day: 7))!
-    static let targetBand: Double = 7.0
+    // Shared UserDefaults for Widget access
+    private static let sharedDefaults = UserDefaults(suiteName: "group.com.ielts.IELTSPrep") ?? UserDefaults.standard
+
+    // User configurable exam date - stored in both standard and shared UserDefaults
+    static var examDate: Date {
+        get {
+            // Try shared defaults first (for widget compatibility)
+            if let savedDate = sharedDefaults.object(forKey: "examDate") as? Date {
+                return savedDate
+            }
+            // Fallback to standard defaults
+            if let savedDate = UserDefaults.standard.object(forKey: "examDate") as? Date {
+                return savedDate
+            }
+            // Default: 3 months from now
+            return Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
+        }
+        set {
+            // Save to both for compatibility
+            UserDefaults.standard.set(newValue, forKey: "examDate")
+            sharedDefaults.set(newValue, forKey: "examDate")
+        }
+    }
+
+    static var targetBand: Double {
+        get {
+            let shared = sharedDefaults.double(forKey: "targetBand")
+            if !shared.isZero { return shared }
+            let standard = UserDefaults.standard.double(forKey: "targetBand")
+            return standard.isZero ? 7.0 : standard
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "targetBand")
+            sharedDefaults.set(newValue, forKey: "targetBand")
+        }
+    }
+
     static let currentLevel: Int = 3
 }
 

@@ -574,10 +574,10 @@ struct SmartTranslatorView: View {
     }
 
     private func fetchTranslation(_ text: String) async throws -> TranslationResult {
-        let apiKey = IELTSAPIService.shared.groqAPIKey
+        let apiService = IELTSAPIService.shared
 
-        guard !apiKey.isEmpty else {
-            throw NSError(domain: "API", code: 401, userInfo: [NSLocalizedDescriptionKey: "API key not configured"])
+        guard apiService.isConfigured else {
+            throw NSError(domain: "API", code: 401, userInfo: [NSLocalizedDescriptionKey: "API key not configured. Go to Settings to add your \(apiService.selectedProvider.rawValue) API key."])
         }
 
         let prompt = """
@@ -643,50 +643,10 @@ struct SmartTranslatorView: View {
         Provide detailed analysis for ALL important words. Include 3 example sentences for each word.
         """
 
-        let url = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        print("Using \(apiService.selectedProvider.rawValue) for translation...")
 
-        let body: [String: Any] = [
-            "model": "llama-3.3-70b-versatile",
-            "messages": [
-                ["role": "user", "content": prompt]
-            ],
-            "temperature": 0.3,
-            "max_tokens": 4000
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        // Check HTTP status
-        if let httpResponse = response as? HTTPURLResponse {
-            print("API HTTP Status: \(httpResponse.statusCode)")
-            if httpResponse.statusCode != 200 {
-                let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-                print("API Error: \(errorBody)")
-                throw NSError(domain: "API", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "API error: \(httpResponse.statusCode)"])
-            }
-        }
-
-        // Parse response
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-
-        // Check for API error in response
-        if let error = json?["error"] as? [String: Any] {
-            let errorMessage = error["message"] as? String ?? "Unknown API error"
-            throw NSError(domain: "API", code: 500, userInfo: [NSLocalizedDescriptionKey: errorMessage])
-        }
-
-        let choices = json?["choices"] as? [[String: Any]]
-        let message = choices?.first?["message"] as? [String: Any]
-        let content = message?["content"] as? String ?? ""
-
-        if content.isEmpty {
-            throw NSError(domain: "API", code: 500, userInfo: [NSLocalizedDescriptionKey: "Empty response from API"])
+        guard let content = await apiService.callAI(prompt: prompt, maxTokens: 4000) else {
+            throw NSError(domain: "API", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to get response from \(apiService.selectedProvider.rawValue)"])
         }
 
         // Extract JSON from response
@@ -694,7 +654,7 @@ struct SmartTranslatorView: View {
     }
 
     private func parseTranslationResponse(_ content: String, original: String) throws -> TranslationResult {
-        print("Raw API response: \(content.prefix(500))")
+        print("Raw API response: \(content.prefix(1000))")
 
         // Find JSON in response - handle nested braces properly
         var jsonString = content
@@ -719,40 +679,118 @@ struct SmartTranslatorView: View {
             throw NSError(domain: "Parse", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON data"])
         }
 
-        let decoder = JSONDecoder()
+        // Always use manual parsing for better control
+        guard let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+            throw NSError(domain: "Parse", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON format"])
+        }
 
-        do {
-            let result = try decoder.decode(TranslationResponse.self, from: jsonData)
+        let translation = json["translation"] as? String ?? "Translation not available"
 
-            return TranslationResult(
-                original: original,
-                translation: result.translation,
-                structure: result.structure,
-                grammarRules: result.grammarRules,
-                wordAnalysis: result.wordAnalysis,
-                ielts: result.ielts,
-                synonyms: result.synonyms
-            )
-        } catch {
-            print("JSON decode error: \(error)")
+        // Parse structure
+        var structure: [SentencePart] = []
+        if let structureArray = json["structure"] as? [[String: Any]] {
+            structure = structureArray.compactMap { item in
+                guard let role = item["role"] as? String,
+                      let english = item["english"] as? String,
+                      let bangla = item["bangla"] as? String else { return nil }
+                return SentencePart(role: role, english: english, bangla: bangla)
+            }
+        }
 
-            // Try manual parsing as fallback
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
-                let translation = json["translation"] as? String ?? "Translation not available"
+        // Parse grammar rules
+        var grammarRules: [GrammarRule] = []
+        if let rulesArray = json["grammarRules"] as? [[String: Any]] {
+            grammarRules = rulesArray.compactMap { item in
+                guard let rule = item["rule"] as? String,
+                      let explanation = item["explanation"] as? String,
+                      let formula = item["formula"] as? String else { return nil }
+                return GrammarRule(rule: rule, explanation: explanation, formula: formula)
+            }
+        }
+        if grammarRules.isEmpty {
+            grammarRules = [GrammarRule(rule: "Simple Sentence", explanation: "Basic sentence structure", formula: "Subject + Verb + Object")]
+        }
 
-                return TranslationResult(
-                    original: original,
-                    translation: translation,
-                    structure: [],
-                    grammarRules: [GrammarRule(rule: "Analysis pending", explanation: "Please try again", formula: "-")],
-                    wordAnalysis: [],
-                    ielts: IELTSVersions(band6: translation, band8: translation),
-                    synonyms: []
+        // Parse word analysis
+        var wordAnalysis: [WordAnalysis] = []
+        if let wordsArray = json["wordAnalysis"] as? [[String: Any]] {
+            wordAnalysis = wordsArray.compactMap { item in
+                guard let word = item["word"] as? String,
+                      let bangla = item["bangla"] as? String,
+                      let partOfSpeech = item["partOfSpeech"] as? String,
+                      let baseForm = item["baseForm"] as? String else { return nil }
+
+                // Parse tenses
+                var tenses: TenseExamples
+                if let tensesDict = item["tenses"] as? [String: Any] {
+                    let past = parseTenseExample(tensesDict["past"])
+                    let present = parseTenseExample(tensesDict["present"])
+                    let future = parseTenseExample(tensesDict["future"])
+                    tenses = TenseExamples(past: past, present: present, future: future)
+                } else {
+                    tenses = TenseExamples(
+                        past: TenseExample(sentence: "He \(baseForm)ed.", bangla: "সে করেছিল।", formula: "Subject + V2"),
+                        present: TenseExample(sentence: "He \(baseForm)s.", bangla: "সে করে।", formula: "Subject + V1"),
+                        future: TenseExample(sentence: "He will \(baseForm).", bangla: "সে করবে।", formula: "Subject + will + V1")
+                    )
+                }
+
+                let examples = item["examples"] as? [String] ?? []
+
+                return WordAnalysis(
+                    word: word,
+                    bangla: bangla,
+                    partOfSpeech: partOfSpeech,
+                    baseForm: baseForm,
+                    tenses: tenses,
+                    examples: examples
                 )
             }
-
-            throw NSError(domain: "Parse", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response: \(error.localizedDescription)"])
         }
+
+        // Parse IELTS versions
+        var ielts: IELTSVersions
+        if let ieltsDict = json["ielts"] as? [String: Any] {
+            ielts = IELTSVersions(
+                band6: ieltsDict["band6"] as? String ?? translation,
+                band8: ieltsDict["band8"] as? String ?? translation
+            )
+        } else {
+            ielts = IELTSVersions(band6: translation, band8: translation)
+        }
+
+        // Parse synonyms
+        var synonyms: [SynonymSet] = []
+        if let synArray = json["synonyms"] as? [[String: Any]] {
+            synonyms = synArray.compactMap { item in
+                guard let original = item["original"] as? String,
+                      let alternatives = item["alternatives"] as? [String] else { return nil }
+                return SynonymSet(original: original, alternatives: alternatives)
+            }
+        }
+
+        print("Parsed: structure=\(structure.count), words=\(wordAnalysis.count), synonyms=\(synonyms.count)")
+
+        return TranslationResult(
+            original: original,
+            translation: translation,
+            structure: structure,
+            grammarRules: grammarRules,
+            wordAnalysis: wordAnalysis,
+            ielts: ielts,
+            synonyms: synonyms
+        )
+    }
+
+    private func parseTenseExample(_ dict: Any?) -> TenseExample {
+        guard let d = dict as? [String: Any] else {
+            return TenseExample(sentence: "-", bangla: "-", formula: "-")
+        }
+        return TenseExample(
+            sentence: d["sentence"] as? String ?? "-",
+            bangla: d["bangla"] as? String ?? "-",
+            formula: d["formula"] as? String ?? "-"
+        )
     }
 }
 

@@ -1,17 +1,120 @@
 import Foundation
 import AVFoundation
 
+// MARK: - AI Provider Enum
+enum AIProvider: String, CaseIterable, Identifiable {
+    case groq = "Groq"
+    case openai = "OpenAI"
+    case gemini = "Google Gemini"
+    case claude = "Anthropic Claude"
+    case mistral = "Mistral AI"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .groq: return "bolt.fill"
+        case .openai: return "brain"
+        case .gemini: return "sparkles"
+        case .claude: return "bubble.left.fill"
+        case .mistral: return "wind"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .groq: return "Fast & Free - LLaMA models"
+        case .openai: return "GPT-4o & GPT-4o-mini"
+        case .gemini: return "Google's AI - Free tier available"
+        case .claude: return "Anthropic's Claude 3.5"
+        case .mistral: return "European AI - Fast & Efficient"
+        }
+    }
+
+    var baseURL: String {
+        switch self {
+        case .groq: return "https://api.groq.com/openai/v1/chat/completions"
+        case .openai: return "https://api.openai.com/v1/chat/completions"
+        case .gemini: return "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        case .claude: return "https://api.anthropic.com/v1/messages"
+        case .mistral: return "https://api.mistral.ai/v1/chat/completions"
+        }
+    }
+
+    var defaultModel: String {
+        switch self {
+        case .groq: return "llama-3.3-70b-versatile"
+        case .openai: return "gpt-4o-mini"
+        case .gemini: return "gemini-1.5-flash"
+        case .claude: return "claude-3-5-sonnet-20241022"
+        case .mistral: return "mistral-large-latest"
+        }
+    }
+
+    var apiKeyName: String {
+        switch self {
+        case .groq: return "groqAPIKey"
+        case .openai: return "openaiAPIKey"
+        case .gemini: return "geminiAPIKey"
+        case .claude: return "claudeAPIKey"
+        case .mistral: return "mistralAPIKey"
+        }
+    }
+}
+
 // MARK: - IELTS API Service
-// All content powered by Groq AI - Fresh, Cambridge-style IELTS content
+// Multi-provider AI support - Groq, OpenAI, Gemini, Claude, Mistral
 // Daily Topic System: All sections (Reading, Writing, Speaking, Vocabulary) are connected
 
 class IELTSAPIService: ObservableObject {
     static let shared = IELTSAPIService()
 
-    // MARK: - API Key (Set via Settings or Environment)
-    @Published var groqAPIKey: String = ""
+    // MARK: - Multi-Provider API Keys
+    @Published var selectedProvider: AIProvider = .groq
+    @Published var apiKeys: [AIProvider: String] = [:]
 
-    var isGroqConfigured: Bool { !groqAPIKey.isEmpty }
+    // Legacy support
+    var groqAPIKey: String {
+        get { apiKeys[.groq] ?? "" }
+        set { apiKeys[.groq] = newValue }
+    }
+
+    var isConfigured: Bool {
+        guard let key = apiKeys[selectedProvider] else { return false }
+        return !key.isEmpty
+    }
+
+    var currentAPIKey: String {
+        apiKeys[selectedProvider] ?? ""
+    }
+
+    // MARK: - Initialization
+    private init() {
+        // Load selected provider
+        if let savedProvider = UserDefaults.standard.string(forKey: "selectedAIProvider"),
+           let provider = AIProvider(rawValue: savedProvider) {
+            selectedProvider = provider
+        }
+
+        // Load all API keys
+        for provider in AIProvider.allCases {
+            if let key = UserDefaults.standard.string(forKey: provider.apiKeyName), !key.isEmpty {
+                apiKeys[provider] = key
+            }
+        }
+
+        print("IELTSAPIService: Loaded provider=\(selectedProvider.rawValue), keys=\(apiKeys.keys.map { $0.rawValue })")
+    }
+
+    func saveProvider(_ provider: AIProvider) {
+        selectedProvider = provider
+        UserDefaults.standard.set(provider.rawValue, forKey: "selectedAIProvider")
+    }
+
+    func saveAPIKey(_ key: String, for provider: AIProvider) {
+        apiKeys[provider] = key
+        UserDefaults.standard.set(key, forKey: provider.apiKeyName)
+    }
 
     @Published var isLoading = false
     @Published var error: String?
@@ -204,55 +307,72 @@ class IELTSAPIService: ObservableObject {
         let followUp: String
     }
 
-    // MARK: - Groq AI Core Function
+    // MARK: - Multi-Provider AI Core Function
 
-    // Custom URLSession that disables HTTP/3 to avoid QUIC issues
+    // Custom URLSession
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.httpAdditionalHeaders = ["Accept": "application/json"]
-        // Disable HTTP/3 to avoid QUIC protocol issues in simulator
-        if #available(iOS 15.0, *) {
-            config.multipathServiceType = .none
-        }
+        config.timeoutIntervalForRequest = 60
         return URLSession(configuration: config)
     }()
 
-    func callGroqAI(prompt: String, systemPrompt: String = "You are an expert IELTS tutor. Always respond with valid JSON only. Do NOT wrap JSON in markdown code blocks. Return raw JSON directly.", maxTokens: Int = 3000, requireJSON: Bool = true) async -> String? {
-        guard !groqAPIKey.isEmpty else {
-            print("Groq API key is empty")
+    /// Call AI using the currently selected provider
+    func callAI(prompt: String, systemPrompt: String = "You are an expert IELTS tutor. Always respond with valid JSON only. Do NOT wrap JSON in markdown code blocks. Return raw JSON directly.", maxTokens: Int = 3000) async -> String? {
+        guard isConfigured else {
+            print("\(selectedProvider.rawValue) API key is empty")
             return nil
         }
 
         // Retry up to 3 times
         for attempt in 1...3 {
-            print("Groq AI attempt \(attempt)...")
+            print("\(selectedProvider.rawValue) AI attempt \(attempt)...")
 
-            if let result = await makeGroqRequest(prompt: prompt, systemPrompt: systemPrompt, maxTokens: maxTokens, requireJSON: requireJSON) {
+            if let result = await makeAIRequest(provider: selectedProvider, prompt: prompt, systemPrompt: systemPrompt, maxTokens: maxTokens) {
                 return result
             }
 
-            // Wait before retry (exponential backoff)
             if attempt < 3 {
                 print("Retrying in \(attempt) seconds...")
                 try? await Task.sleep(nanoseconds: UInt64(attempt) * 1_000_000_000)
             }
         }
 
-        print("All Groq AI attempts failed")
+        print("All \(selectedProvider.rawValue) AI attempts failed")
         return nil
     }
 
-    private func makeGroqRequest(prompt: String, systemPrompt: String, maxTokens: Int, requireJSON: Bool) async -> String? {
-        let url = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
+    /// Legacy function for backward compatibility
+    func callGroqAI(prompt: String, systemPrompt: String = "You are an expert IELTS tutor. Always respond with valid JSON only. Do NOT wrap JSON in markdown code blocks. Return raw JSON directly.", maxTokens: Int = 3000, requireJSON: Bool = true) async -> String? {
+        return await callAI(prompt: prompt, systemPrompt: systemPrompt, maxTokens: maxTokens)
+    }
+
+    private func makeAIRequest(provider: AIProvider, prompt: String, systemPrompt: String, maxTokens: Int) async -> String? {
+        let apiKey = apiKeys[provider] ?? ""
+        guard !apiKey.isEmpty else { return nil }
+
+        switch provider {
+        case .groq, .openai, .mistral:
+            return await makeOpenAICompatibleRequest(provider: provider, apiKey: apiKey, prompt: prompt, systemPrompt: systemPrompt, maxTokens: maxTokens)
+        case .gemini:
+            return await makeGeminiRequest(apiKey: apiKey, prompt: prompt, systemPrompt: systemPrompt, maxTokens: maxTokens)
+        case .claude:
+            return await makeClaudeRequest(apiKey: apiKey, prompt: prompt, systemPrompt: systemPrompt, maxTokens: maxTokens)
+        }
+    }
+
+    // MARK: - OpenAI Compatible (Groq, OpenAI, Mistral)
+    private func makeOpenAICompatibleRequest(provider: AIProvider, apiKey: String, prompt: String, systemPrompt: String, maxTokens: Int) async -> String? {
+        guard let url = URL(string: provider.baseURL) else { return nil }
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 60
-        request.assumesHTTP3Capable = false
-        request.setValue("Bearer \(groqAPIKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         var body: [String: Any] = [
-            "model": "llama-3.1-8b-instant",
+            "model": provider.defaultModel,
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": prompt]
@@ -261,8 +381,8 @@ class IELTSAPIService: ObservableObject {
             "max_tokens": maxTokens
         ]
 
-        // Only add JSON format requirement if needed
-        if requireJSON {
+        // JSON mode for supported providers
+        if provider == .groq || provider == .openai {
             body["response_format"] = ["type": "json_object"]
         }
 
@@ -271,34 +391,149 @@ class IELTSAPIService: ObservableObject {
             let (data, response) = try await urlSession.data(for: request)
 
             if let httpResponse = response as? HTTPURLResponse {
-                print("Groq API Status: \(httpResponse.statusCode)")
+                print("\(provider.rawValue) API Status: \(httpResponse.statusCode)")
                 if httpResponse.statusCode != 200 {
-                    print("Non-200 response: \(String(data: data, encoding: .utf8) ?? "no body")")
+                    print("Error: \(String(data: data, encoding: .utf8) ?? "no body")")
                     return nil
                 }
             }
 
-            let groqResponse = try JSONDecoder().decode(GroqResponse.self, from: data)
-            let content = groqResponse.choices.first?.message.content
-            print("Groq AI Response: \(content?.prefix(100) ?? "nil")...")
+            let aiResponse = try JSONDecoder().decode(OpenAIResponse.self, from: data)
+            let content = aiResponse.choices.first?.message.content
+            print("\(provider.rawValue) Response: \(content?.prefix(100) ?? "nil")...")
             return content
         } catch {
-            print("Groq request error: \(error.localizedDescription)")
+            print("\(provider.rawValue) request error: \(error.localizedDescription)")
             return nil
         }
     }
 
-    struct GroqResponse: Codable {
-        let choices: [GroqChoice]
+    // MARK: - Google Gemini
+    private func makeGeminiRequest(apiKey: String, prompt: String, systemPrompt: String, maxTokens: Int) async -> String? {
+        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\(apiKey)"
+        guard let url = URL(string: urlString) else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "contents": [
+                ["parts": [["text": "\(systemPrompt)\n\n\(prompt)"]]]
+            ],
+            "generationConfig": [
+                "temperature": 0.3,
+                "maxOutputTokens": maxTokens,
+                "responseMimeType": "application/json"
+            ]
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await urlSession.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                print("Gemini API Status: \(httpResponse.statusCode)")
+                if httpResponse.statusCode != 200 {
+                    print("Error: \(String(data: data, encoding: .utf8) ?? "no body")")
+                    return nil
+                }
+            }
+
+            let geminiResponse = try JSONDecoder().decode(GeminiResponse.self, from: data)
+            let content = geminiResponse.candidates?.first?.content.parts.first?.text
+            print("Gemini Response: \(content?.prefix(100) ?? "nil")...")
+            return content
+        } catch {
+            print("Gemini request error: \(error.localizedDescription)")
+            return nil
+        }
     }
 
-    struct GroqChoice: Codable {
-        let message: GroqMessage
+    // MARK: - Anthropic Claude
+    private func makeClaudeRequest(apiKey: String, prompt: String, systemPrompt: String, maxTokens: Int) async -> String? {
+        guard let url = URL(string: "https://api.anthropic.com/v1/messages") else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "model": AIProvider.claude.defaultModel,
+            "max_tokens": maxTokens,
+            "system": systemPrompt,
+            "messages": [
+                ["role": "user", "content": prompt]
+            ]
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await urlSession.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                print("Claude API Status: \(httpResponse.statusCode)")
+                if httpResponse.statusCode != 200 {
+                    print("Error: \(String(data: data, encoding: .utf8) ?? "no body")")
+                    return nil
+                }
+            }
+
+            let claudeResponse = try JSONDecoder().decode(ClaudeResponse.self, from: data)
+            let content = claudeResponse.content.first?.text
+            print("Claude Response: \(content?.prefix(100) ?? "nil")...")
+            return content
+        } catch {
+            print("Claude request error: \(error.localizedDescription)")
+            return nil
+        }
     }
 
-    struct GroqMessage: Codable {
+    // MARK: - Response Models
+    struct OpenAIResponse: Codable {
+        let choices: [OpenAIChoice]
+    }
+
+    struct OpenAIChoice: Codable {
+        let message: OpenAIMessage
+    }
+
+    struct OpenAIMessage: Codable {
         let content: String
     }
+
+    struct GeminiResponse: Codable {
+        let candidates: [GeminiCandidate]?
+    }
+
+    struct GeminiCandidate: Codable {
+        let content: GeminiContent
+    }
+
+    struct GeminiContent: Codable {
+        let parts: [GeminiPart]
+    }
+
+    struct GeminiPart: Codable {
+        let text: String
+    }
+
+    struct ClaudeResponse: Codable {
+        let content: [ClaudeContent]
+    }
+
+    struct ClaudeContent: Codable {
+        let text: String
+    }
+
+    // Legacy type aliases
+    typealias GroqResponse = OpenAIResponse
+    typealias GroqChoice = OpenAIChoice
+    typealias GroqMessage = OpenAIMessage
 
     // MARK: - Generate Daily Vocabulary (Based on Topic)
 

@@ -12,15 +12,14 @@ class AppViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
 
-    private let examDate = ExamConfig.examDate
-
     init() {
         calculateDaysRemaining()
     }
 
     func calculateDaysRemaining() {
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.day], from: Date(), to: examDate)
+        // Always read fresh from ExamConfig (not cached)
+        let components = calendar.dateComponents([.day], from: Date(), to: ExamConfig.examDate)
         daysRemaining = max(0, components.day ?? 0)
     }
 
